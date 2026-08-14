@@ -1,0 +1,19 @@
+[package]
+name = "omt-obs-plugin"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.97"
+license = "GPL-2.0-only"
+publish = false
+description = "Pure-Rust Open Media Transport plugin for OBS Studio"
+repository = "https://github.com/MikanseiLaboratory/omt-obs-plugin"
+readme = "README.md"
+
+[lib]
+name = "omtplugin"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+obs-wrapper = { git = "https://github.com/MikanseiLaboratory/rust-obs-plugins.git", rev = "2d90be795e7ca95dbdc46f9222ea7299c23c45dd" }
+openmediatransport = { git = "https://github.com/MikanseiLaboratory/openmediatransport-rs" }
+log = "0.4"
