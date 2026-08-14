@@ -348,7 +348,7 @@ dependencies = [
 [[package]]
 name = "obs-sys"
 version = "0.3.0"
-source = "git+https://github.com/MikanseiLaboratory/rust-obs-plugins.git?rev=5080c6a1d1e3a0cba33360930761ca084f9e3ee7#5080c6a1d1e3a0cba33360930761ca084f9e3ee7"
+source = "git+https://github.com/MikanseiLaboratory/rust-obs-plugins.git?rev=2d90be795e7ca95dbdc46f9222ea7299c23c45dd#2d90be795e7ca95dbdc46f9222ea7299c23c45dd"
 dependencies = [
  "bindgen",
  "cc",
@@ -360,7 +360,7 @@ dependencies = [
 [[package]]
 name = "obs-wrapper"
 version = "0.4.1"
-source = "git+https://github.com/MikanseiLaboratory/rust-obs-plugins.git?rev=5080c6a1d1e3a0cba33360930761ca084f9e3ee7#5080c6a1d1e3a0cba33360930761ca084f9e3ee7"
+source = "git+https://github.com/MikanseiLaboratory/rust-obs-plugins.git?rev=2d90be795e7ca95dbdc46f9222ea7299c23c45dd#2d90be795e7ca95dbdc46f9222ea7299c23c45dd"
 dependencies = [
  "log",
  "num-traits",

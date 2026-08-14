@@ -4,6 +4,7 @@ Pure-Rust Open Media Transport plugin for OBS Studio **32.2.1**.
 It sends and receives SDR video plus FPA1 audio without `libvmx.dll` or .NET.
 
 [![Build](https://github.com/MikanseiLaboratory/omt-obs-plugin/actions/workflows/build.yml/badge.svg)](https://github.com/MikanseiLaboratory/omt-obs-plugin/actions/workflows/build.yml)
+[![License: GPL-2.0-only](https://img.shields.io/github/license/MikanseiLaboratory/omt-obs-plugin)](./LICENSE)
 
 ## Features
 
@@ -65,4 +66,4 @@ Do not load this plugin together with the official C# `omtplugin`.
 
 ## License
 
-GPL-2.0 (required by `obs-wrapper` / libobs). The OMT protocol crate remains MIT.
+This plugin is licensed under the [GNU General Public License v2.0 only](./LICENSE) (`GPL-2.0-only`), matching libobs / `obs-wrapper`. The OMT protocol crate (`openmediatransport-rs`) remains MIT.
