@@ -1,4 +1,4 @@
-//! Offscreen BGRA capture used by Preview output and the dedicated filter.
+//! Offscreen BGRA capture.
 
 use std::ptr;
 

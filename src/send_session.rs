@@ -1,4 +1,4 @@
-//! Background OMT sender: poll peers and encode without blocking OBS.
+//! Background OMT sender.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Receiver;

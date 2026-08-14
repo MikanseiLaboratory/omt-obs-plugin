@@ -1,9 +1,7 @@
-//! Timestamp conversion between OBS nanoseconds and OMT 100 ns ticks.
+//! OBS nanoseconds ↔ OMT 100 ns ticks.
 
-/// OBS uses nanoseconds; OMT uses 100 ns ticks.
 pub const NS_PER_OMT_TICK: u64 = 100;
 
-/// Convert OMT 100 ns ticks to OBS nanoseconds.
 pub fn omt_ticks_to_obs_ns(ticks: i64) -> u64 {
     if ticks <= 0 {
         0
@@ -12,7 +10,6 @@ pub fn omt_ticks_to_obs_ns(ticks: i64) -> u64 {
     }
 }
 
-/// Convert OBS nanoseconds to OMT 100 ns ticks.
 pub fn obs_ns_to_omt_ticks(ns: u64) -> i64 {
     (ns / NS_PER_OMT_TICK) as i64
 }

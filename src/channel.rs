@@ -1,9 +1,9 @@
-//! Bounded handoff that never blocks the OBS callback thread.
+//! Bounded frame queue.
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{sync_channel, Receiver, SyncSender, TrySendError};
 
-/// Latest-wins-ish bounded queue: if full, the new item is dropped.
+/// Drops the new item when the queue is full.
 pub struct DropChannel<T> {
     tx: SyncSender<T>,
     dropped: AtomicU64,

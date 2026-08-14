@@ -36,6 +36,9 @@ jobs:
       - run: cargo fmt -- --check
       - run: cargo clippy --no-deps -- -D warnings
       - run: cargo test
+        env:
+          DYLD_FALLBACK_FRAMEWORK_PATH: /Applications/OBS.app/Contents/Frameworks
+          DYLD_FALLBACK_LIBRARY_PATH: /Applications/OBS.app/Contents/Frameworks
       - run: cargo build --release
       - name: Plugin artifact smoke
         shell: bash

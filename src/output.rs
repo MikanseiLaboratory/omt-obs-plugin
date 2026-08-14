@@ -59,7 +59,7 @@ impl Outputable for OmtOutput {
             return false;
         };
         if let Err(e) = obs_format_to_omt_codec(format) {
-            warn!("OMT output refuses format {format:?}: {e:?} (SDR only in this build)");
+            warn!("OMT output refuses format {format:?}: {e:?}");
             return false;
         }
         let name = current_config().name;
@@ -140,7 +140,7 @@ impl RawAudioOutput for OmtOutput {
     }
 }
 
-// --- hidden settings source + lifecycle ------------------------------------
+// --- settings source + lifecycle -------------------------------------------
 
 struct Controller {
     config_path: Option<String>,
@@ -324,7 +324,6 @@ impl SaveSource for OmtOutputSettings {
     }
 }
 
-/// Builder helper so the hidden settings source is not user-visible.
 pub fn settings_flags() -> u32 {
     OBS_SOURCE_CAP_DISABLED
 }

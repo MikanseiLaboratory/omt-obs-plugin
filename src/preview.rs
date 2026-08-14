@@ -1,4 +1,4 @@
-//! Studio-mode Preview OMT sender (DistroAV-style render callback).
+//! Preview OMT sender.
 
 use std::ptr;
 use std::sync::Mutex;

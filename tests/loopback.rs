@@ -1,5 +1,4 @@
-//! Sender/receiver loopback using openmediatransport (no OBS runtime).
-//! Mirrors `openmediatransport-rs` examples/send_receive.rs (UYVY → VMX1 → BGRA).
+//! OMT sender/receiver loopback.
 
 use std::thread;
 use std::time::Duration;

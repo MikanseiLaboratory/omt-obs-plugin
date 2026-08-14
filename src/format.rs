@@ -1,4 +1,4 @@
-//! OBS ↔ OMT pixel format mapping (SDR only).
+//! OBS ↔ OMT pixel format mapping.
 
 use obs_wrapper::media::VideoFormat;
 use obs_wrapper::obs_sys::{audio_data, video_data, video_format};
@@ -11,7 +11,6 @@ pub enum SdrMappingError {
     NullPlane,
 }
 
-/// Map an OBS video format to an OMT codec. HDR formats are rejected.
 pub fn obs_format_to_omt_codec(format: VideoFormat) -> Result<Codec, SdrMappingError> {
     match format {
         VideoFormat::NV12 => Ok(Codec::Nv12),
@@ -38,7 +37,6 @@ pub fn video_flags_for(format: VideoFormat) -> VideoFlags {
     }
 }
 
-/// Packed size of one video frame for the given format / geometry.
 pub fn packed_frame_len(format: VideoFormat, _width: u32, height: u32, stride0: u32) -> usize {
     let h = height as usize;
     let stride = stride0 as usize;
@@ -49,7 +47,6 @@ pub fn packed_frame_len(format: VideoFormat, _width: u32, height: u32, stride0: 
     }
 }
 
-/// Copy an OBS `video_data` frame into an owned OMT [`MediaFrame`].
 pub fn copy_video_data(
     frame: &video_data,
     width: u32,
@@ -102,7 +99,6 @@ pub fn copy_video_data(
     })
 }
 
-/// Copy OBS planar float audio into an owned OMT audio frame.
 pub fn copy_audio_data(
     frame: &audio_data,
     channels: u32,
