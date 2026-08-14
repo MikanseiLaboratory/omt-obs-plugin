@@ -1,0 +1,49 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  plugin:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+          - os: ubuntu-latest
+          - os: macos-latest
+          - os: macos-13
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.97.0
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Install OBS (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo add-apt-repository ppa:obsproject/obs-studio
+          sudo apt-get update
+          sudo apt-get install -y obs-studio
+      - name: Install OBS (Windows)
+        if: runner.os == 'Windows'
+        run: choco install obs-studio llvm -y
+      - name: Install OBS (macOS)
+        if: runner.os == 'macOS'
+        run: brew install --cask obs
+      - run: cargo fmt -- --check
+      - run: cargo clippy --no-deps -- -D warnings
+      - run: cargo test
+      - run: cargo build --release
+      - name: Plugin artifact smoke
+        shell: bash
+        run: |
+          case "${{ runner.os }}" in
+            Windows) f=target/release/omtplugin.dll ;;
+            macOS) f=target/release/libomtplugin.dylib ;;
+            *) f=target/release/libomtplugin.so ;;
+          esac
+          test -f "$f"
+          echo "built $f ($(wc -c < "$f") bytes)"
