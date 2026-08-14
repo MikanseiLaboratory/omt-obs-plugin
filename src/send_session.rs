@@ -17,20 +17,18 @@ pub struct SendSession {
     stop: Arc<AtomicBool>,
     join: Option<JoinHandle<()>>,
     name: String,
+    frame_types: FrameType,
 }
 
 impl SendSession {
-    pub fn start(name: impl Into<String>) -> Result<Self, String> {
+    pub fn start(name: impl Into<String>, frame_types: FrameType) -> Result<Self, String> {
         let name = name.into();
         if name.trim().is_empty() {
             return Err("OMT sender name is empty".into());
         }
-        let mut sender = Sender::create_with_config(
-            name.clone(),
-            FrameType::VIDEO | FrameType::AUDIO | FrameType::METADATA,
-            SenderConfig::default(),
-        )
-        .map_err(|e| e.to_string())?;
+        let mut sender =
+            Sender::create_with_config(name.clone(), frame_types, SenderConfig::default())
+                .map_err(|e| e.to_string())?;
         sender.set_sender_info(SenderInfo::new(
             "OBS Studio",
             "omt-obs-plugin",
@@ -59,12 +57,16 @@ impl SendSession {
             stop,
             join: Some(join),
             name,
+            frame_types,
         })
     }
 
-    #[allow(dead_code)]
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    pub fn frame_types(&self) -> FrameType {
+        self.frame_types
     }
 
     pub fn push_video(&self, frame: MediaFrame) {
@@ -88,6 +90,7 @@ impl SendSession {
 
 impl Drop for SendSession {
     fn drop(&mut self) {
+        info!("OMT sender '{}' stopping", self.name);
         self.stop.store(true, Ordering::Release);
         if let Some(join) = self.join.take() {
             let _ = join.join();

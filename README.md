@@ -14,7 +14,7 @@ Pure-Rust Open Media Transport plugin for OBS Studio 32.2.1.
 | Preview output | — | Studio Mode preview, or the current scene |
 | Dedicated filter | `omt_filter` | Sends the filtered source or scene |
 
-Settings keys: `sourceProperty`, `qualityProperty`, `enabledProperty`, `nameProperty`, plus `previewEnabledProperty` / `previewNameProperty`.
+Settings keys: `sourceProperty`, `qualityProperty`, `enabledProperty`, `nameProperty`, plus `previewEnabledProperty` / `previewNameProperty`. Program and Dedicated Output also have Embedded / Video Only / Audio Only (`programModeProperty`, `filterModeProperty`).
 
 ## Formats
 
@@ -44,9 +44,9 @@ Output: `omtplugin.dll` / `libomtplugin.so` / `libomtplugin.dylib`.
 ## Usage
 
 1. **Receive:** Add Source → OMT Source, pick a discovered `omt://` URL or type one.
-2. **Program:** Tools → OMT Output Settings → enable Program Output (default name `OBS Output`).
-3. **Preview:** enable Preview Output in the same dialog (default name `OBS Preview`).
-4. **Filter:** Filters → OMT Dedicated Output. Name tokens: `${source}`, `${filter}`.
+2. **Program:** Tools → OMT Output Settings → enable Program Output (default name `OBS Output`). Media: Embedded, Video Only, or Audio Only.
+3. **Preview:** enable Preview Output in the same dialog (default name `OBS Preview`). Preview is video-only (studio preview, or the current scene).
+4. **Filter:** Filters → OMT Dedicated Output. Name tokens: `${source}`, `${filter}`. Media: Embedded, Video Only, or Audio Only.
 
 IDs `omtsource` / `omtoutput` / `omtoutputsettings` are shared with the C# `omtplugin`.
 

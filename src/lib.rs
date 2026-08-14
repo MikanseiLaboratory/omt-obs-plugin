@@ -14,6 +14,7 @@ mod filter;
 mod format;
 mod graphics_capture;
 mod ids;
+mod media_mode;
 mod output;
 mod preview;
 mod receive;

@@ -17,6 +17,8 @@ pub fn obs_format_to_omt_codec(format: VideoFormat) -> Result<Codec, SdrMappingE
         VideoFormat::UYVY => Ok(Codec::Uyvy),
         VideoFormat::YUY2 => Ok(Codec::Yuy2),
         VideoFormat::BGRA | VideoFormat::BGRX => Ok(Codec::Bgra),
+        // TODO: Accept these once the OMT VMX path supports high-bit-depth
+        // color formats end to end. For now only SDR 8-bit video is sent.
         VideoFormat::P010 | VideoFormat::P216 => Err(SdrMappingError::UnsupportedHdr),
         _ => Err(SdrMappingError::UnsupportedFormat),
     }
@@ -30,11 +32,11 @@ pub fn is_hdr_format(format: video_format) -> bool {
     )
 }
 
-pub fn video_flags_for(format: VideoFormat) -> VideoFlags {
-    match format {
-        VideoFormat::BGRA => VideoFlags::ALPHA | VideoFlags::PREMULTIPLIED,
-        _ => VideoFlags::NONE,
-    }
+pub fn video_flags_for(_format: VideoFormat) -> VideoFlags {
+    // TODO: Preserve alpha once the OMT VMX receiver supports alpha/high-bit-
+    // depth video. OBS output is already composited, so BGRA is currently sent
+    // as opaque BGRX to stay within the supported SDR 8-bit path.
+    VideoFlags::NONE
 }
 
 pub fn packed_frame_len(format: VideoFormat, _width: u32, height: u32, stride0: u32) -> usize {

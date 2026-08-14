@@ -4,12 +4,12 @@ use std::ptr;
 
 use obs_wrapper::obs_sys::{
     gs_blend_function, gs_blend_state_pop, gs_blend_state_push, gs_blend_type_GS_BLEND_ONE,
-    gs_blend_type_GS_BLEND_ZERO, gs_clear, gs_color_format_GS_BGRA, gs_ortho, gs_stage_texture,
-    gs_stagesurf_t, gs_stagesurface_create, gs_stagesurface_destroy, gs_stagesurface_map,
-    gs_stagesurface_unmap, gs_texrender_begin, gs_texrender_create, gs_texrender_destroy,
-    gs_texrender_end, gs_texrender_get_texture, gs_texrender_reset, gs_texrender_t,
-    gs_zstencil_format_GS_ZS_NONE, obs_enter_graphics, obs_leave_graphics, obs_source_t,
-    obs_source_video_render, vec4, GS_CLEAR_COLOR,
+    gs_blend_type_GS_BLEND_ZERO, gs_clear, gs_color_format_GS_BGRA, gs_flush, gs_ortho,
+    gs_stage_texture, gs_stagesurf_t, gs_stagesurface_create, gs_stagesurface_destroy,
+    gs_stagesurface_map, gs_stagesurface_unmap, gs_texrender_begin, gs_texrender_create,
+    gs_texrender_destroy, gs_texrender_end, gs_texrender_get_texture, gs_texrender_reset,
+    gs_texrender_t, gs_zstencil_format_GS_ZS_NONE, obs_enter_graphics, obs_leave_graphics,
+    obs_source_t, obs_source_video_render, vec4, GS_CLEAR_COLOR,
 };
 
 pub struct BgraCapture {
@@ -20,17 +20,21 @@ pub struct BgraCapture {
 }
 
 impl BgraCapture {
+    /// Graphics objects are created lazily on the OBS graphics thread.
     pub fn new() -> Self {
-        unsafe {
-            obs_enter_graphics();
-            let texrender =
-                gs_texrender_create(gs_color_format_GS_BGRA, gs_zstencil_format_GS_ZS_NONE);
-            obs_leave_graphics();
-            Self {
-                texrender,
-                stagesurface: ptr::null_mut(),
-                width: 0,
-                height: 0,
+        Self {
+            texrender: ptr::null_mut(),
+            stagesurface: ptr::null_mut(),
+            width: 0,
+            height: 0,
+        }
+    }
+
+    fn ensure_texrender(&mut self) {
+        if self.texrender.is_null() {
+            unsafe {
+                self.texrender =
+                    gs_texrender_create(gs_color_format_GS_BGRA, gs_zstencil_format_GS_ZS_NONE);
             }
         }
     }
@@ -60,7 +64,11 @@ impl BgraCapture {
         height: u32,
         draw: F,
     ) -> Option<Vec<u8>> {
-        if width == 0 || height == 0 || self.texrender.is_null() {
+        if width == 0 || height == 0 {
+            return None;
+        }
+        self.ensure_texrender();
+        if self.texrender.is_null() {
             return None;
         }
         self.ensure_size(width, height);
@@ -82,7 +90,11 @@ impl BgraCapture {
             gs_texrender_end(self.texrender);
 
             let tex = gs_texrender_get_texture(self.texrender);
+            if tex.is_null() {
+                return None;
+            }
             gs_stage_texture(self.stagesurface, tex);
+            gs_flush();
 
             let mut src: *mut u8 = ptr::null_mut();
             let mut linesize: u32 = 0;

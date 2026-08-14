@@ -18,6 +18,9 @@ pub const PROP_NAME: &str = "nameProperty";
 pub const PROP_PREVIEW_ENABLED: &str = "previewEnabledProperty";
 pub const PROP_PREVIEW_NAME: &str = "previewNameProperty";
 pub const PROP_FILTER_NAME: &str = "filterNameProperty";
+pub const PROP_PROGRAM_MODE: &str = "programModeProperty";
+pub const PROP_PREVIEW_MODE: &str = "previewModeProperty";
+pub const PROP_FILTER_MODE: &str = "filterModeProperty";
 
 pub const DEFAULT_OUTPUT_NAME: &str = "OBS Output";
 pub const DEFAULT_PREVIEW_NAME: &str = "OBS Preview";

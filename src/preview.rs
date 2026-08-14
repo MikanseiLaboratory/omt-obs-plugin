@@ -1,4 +1,4 @@
-//! Preview OMT sender.
+//! Preview OMT sender (video only).
 
 use std::ptr;
 use std::sync::Mutex;
@@ -6,16 +6,17 @@ use std::sync::Mutex;
 use log::{info, warn};
 use obs_wrapper::frontend::FrontendEvent;
 use obs_wrapper::obs_sys::{
-    obs_add_main_render_callback, obs_get_video_frame_time, obs_get_video_info,
-    obs_remove_main_render_callback, obs_source_get_base_height, obs_source_get_base_width,
-    obs_source_get_ref, obs_source_release, obs_source_t, obs_video_info,
+    obs_add_main_render_callback, obs_frontend_get_current_preview_scene,
+    obs_frontend_get_current_scene, obs_frontend_preview_program_mode_active,
+    obs_get_video_frame_time, obs_get_video_info, obs_remove_main_render_callback,
+    obs_source_get_base_height, obs_source_get_base_width, obs_source_get_height,
+    obs_source_get_width, obs_source_release, obs_source_t, obs_video_info,
 };
 use openmediatransport::{Codec, ColorSpace, FrameType, MediaFrame, VideoFlags};
 
 use crate::clock::obs_ns_to_omt_ticks;
 use crate::graphics_capture::BgraCapture;
 use crate::send_session::SendSession;
-use obs_wrapper::wrapper::PtrWrapper;
 
 struct PreviewState {
     session: Option<SendSession>,
@@ -23,6 +24,8 @@ struct PreviewState {
     source: *mut obs_source_t,
     fps_num: u32,
     fps_den: u32,
+    canvas_w: u32,
+    canvas_h: u32,
     callback_installed: bool,
 }
 
@@ -34,6 +37,8 @@ static STATE: Mutex<PreviewState> = Mutex::new(PreviewState {
     source: ptr::null_mut(),
     fps_num: 60,
     fps_den: 1,
+    canvas_w: 1920,
+    canvas_h: 1080,
     callback_installed: false,
 });
 
@@ -42,12 +47,13 @@ fn set_source(state: &mut PreviewState, src: *mut obs_source_t) {
         if !state.source.is_null() {
             obs_source_release(state.source);
         }
-        state.source = if src.is_null() {
-            ptr::null_mut()
-        } else {
-            obs_source_get_ref(src)
-        };
+        // `obs_frontend_get_current_*_scene` already returns a new reference.
+        state.source = src;
     }
+}
+
+fn preview_frame_types() -> FrameType {
+    FrameType::VIDEO | FrameType::METADATA
 }
 
 pub fn apply(enabled: bool, name: &str) {
@@ -55,7 +61,13 @@ pub fn apply(enabled: bool, name: &str) {
     if !enabled {
         return;
     }
-    let session = match SendSession::start(name) {
+    let name = name.trim();
+    let name = if name.is_empty() {
+        crate::ids::DEFAULT_PREVIEW_NAME
+    } else {
+        name
+    };
+    let session = match SendSession::start(name, preview_frame_types()) {
         Ok(s) => s,
         Err(e) => {
             warn!("OMT preview sender failed: {e}");
@@ -66,8 +78,8 @@ pub fn apply(enabled: bool, name: &str) {
         graphics_module: ptr::null(),
         fps_num: 60,
         fps_den: 1,
-        base_width: 0,
-        base_height: 0,
+        base_width: 1920,
+        base_height: 1080,
         output_width: 0,
         output_height: 0,
         output_format: 0,
@@ -85,6 +97,8 @@ pub fn apply(enabled: bool, name: &str) {
         state.capture = Some(BgraCapture::new());
         state.fps_num = ovi.fps_num.max(1);
         state.fps_den = ovi.fps_den.max(1);
+        state.canvas_w = ovi.base_width.max(1);
+        state.canvas_h = ovi.base_height.max(1);
         refresh_source(&mut state);
         if !state.callback_installed {
             unsafe {
@@ -92,7 +106,14 @@ pub fn apply(enabled: bool, name: &str) {
             }
             state.callback_installed = true;
         }
-        info!("OMT preview output started as '{name}'");
+        info!(
+            "OMT preview output started as '{name}' (source {})",
+            if state.source.is_null() {
+                "pending"
+            } else {
+                "ready"
+            }
+        );
     }
 }
 
@@ -133,15 +154,13 @@ pub fn on_frontend_event(event: FrontendEvent) {
 }
 
 fn refresh_source(state: &mut PreviewState) {
-    let src = if obs_wrapper::frontend::preview_program_mode_active() {
-        obs_wrapper::frontend::current_preview_scene()
-    } else {
-        obs_wrapper::frontend::current_scene()
+    let ptr = unsafe {
+        if obs_frontend_preview_program_mode_active() {
+            obs_frontend_get_current_preview_scene()
+        } else {
+            obs_frontend_get_current_scene()
+        }
     };
-    let ptr = src
-        .as_ref()
-        .map(|s| unsafe { s.as_ptr() as *mut obs_source_t })
-        .unwrap_or(ptr::null_mut());
     set_source(state, ptr);
 }
 
@@ -150,8 +169,23 @@ unsafe extern "C" fn render_preview(_param: *mut std::ffi::c_void, _cx: u32, _cy
         return;
     };
     let source = state.source;
-    let width = obs_source_get_base_width(source);
-    let height = obs_source_get_base_height(source);
+    if source.is_null() {
+        return;
+    }
+    let mut width = obs_source_get_base_width(source);
+    let mut height = obs_source_get_base_height(source);
+    if width == 0 {
+        width = obs_source_get_width(source);
+    }
+    if height == 0 {
+        height = obs_source_get_height(source);
+    }
+    if width == 0 {
+        width = state.canvas_w;
+    }
+    if height == 0 {
+        height = state.canvas_h;
+    }
     let pixels = {
         let Some(capture) = state.capture.as_mut() else {
             return;
@@ -172,7 +206,10 @@ unsafe extern "C" fn render_preview(_param: *mut std::ffi::c_void, _cx: u32, _cy
         width: width as i32,
         height: height as i32,
         stride: (width * 4) as i32,
-        flags: VideoFlags::ALPHA | VideoFlags::PREMULTIPLIED,
+        // TODO: Preserve alpha once the OMT VMX receiver supports alpha/high-
+        // bit-depth video. OBS has already composited this SDR surface, so it
+        // is currently sent as opaque BGRX.
+        flags: VideoFlags::NONE,
         frame_rate_n: state.fps_num as i32,
         frame_rate_d: state.fps_den as i32,
         aspect_ratio: if height == 0 {

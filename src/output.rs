@@ -54,16 +54,24 @@ impl Outputable for OmtOutput {
         let video = self.output.video();
         let audio = self.output.audio();
         let info = video.info();
-        let Some(format) = info.format else {
-            warn!("OMT output: unknown video format");
-            return false;
-        };
-        if let Err(e) = obs_format_to_omt_codec(format) {
-            warn!("OMT output refuses format {format:?}: {e:?}");
-            return false;
+        let cfg = current_config();
+        let format = info.format;
+        if cfg.program_mode.video() {
+            let Some(format) = format else {
+                warn!("OMT output: unknown video format");
+                return false;
+            };
+            if let Err(e) = obs_format_to_omt_codec(format) {
+                warn!("OMT output refuses format {format:?}: {e:?}");
+                return false;
+            }
         }
-        let name = current_config().name;
-        match SendSession::start(name) {
+        let name = if cfg.name.trim().is_empty() {
+            crate::ids::DEFAULT_OUTPUT_NAME.to_string()
+        } else {
+            cfg.name
+        };
+        match SendSession::start(name, cfg.program_mode.frame_types()) {
             Ok(session) => {
                 self.session = Some(session);
                 self.width = info.width;
@@ -74,7 +82,7 @@ impl Outputable for OmtOutput {
                     // Prefer exact fraction from OBS video info when available.
                     self.fps_num = info.frame_rate as u32;
                 }
-                self.format = Some(format);
+                self.format = format;
                 self.sample_rate = audio.sample_rate() as u32;
                 self.channels = audio.channels() as u32;
                 if !self.output.start_capture(0) {
@@ -110,6 +118,9 @@ impl GetNameOutput for OmtOutput {
 
 impl RawVideoOutput for OmtOutput {
     fn raw_video(&mut self, frame: &mut video_data) {
+        if !current_config().program_mode.video() {
+            return;
+        }
         let (Some(session), Some(format)) = (self.session.as_ref(), self.format) else {
             return;
         };
@@ -130,6 +141,9 @@ impl RawVideoOutput for OmtOutput {
 
 impl RawAudioOutput for OmtOutput {
     fn raw_audio(&mut self, frame: &mut audio_data) {
+        if !current_config().program_mode.audio() {
+            return;
+        }
         let Some(session) = self.session.as_ref() else {
             return;
         };
@@ -145,6 +159,7 @@ impl RawAudioOutput for OmtOutput {
 struct Controller {
     config_path: Option<String>,
     config: OutputConfig,
+    applied: Option<OutputConfig>,
     settings_source: Option<SourceRef>,
     main: Option<OutputRef>,
 }
@@ -156,9 +171,11 @@ static CONTROLLER: Mutex<Controller> = Mutex::new(Controller {
     config: OutputConfig {
         enabled: false,
         name: String::new(),
+        program_mode: crate::media_mode::MediaMode::Embedded,
         preview_enabled: false,
         preview_name: String::new(),
     },
+    applied: None,
     settings_source: None,
     main: None,
 });
@@ -191,11 +208,27 @@ pub fn on_frontend_event(event: obs_wrapper::frontend::FrontendEvent) {
 
 pub fn show_settings() {
     ensure_settings_source();
-    if let Ok(c) = CONTROLLER.lock() {
-        if let Some(src) = c.settings_source.as_ref() {
-            obs_wrapper::frontend::open_source_properties(src);
+    let (ptr, cfg) = match CONTROLLER.lock() {
+        Ok(c) => {
+            let ptr = c
+                .settings_source
+                .as_ref()
+                .map(|src| unsafe { src.as_ptr() as *mut obs_wrapper::obs_sys::obs_source_t });
+            (ptr, c.config.clone())
+        }
+        Err(_) => return,
+    };
+    if let Some(ptr) = ptr {
+        if !ptr.is_null() {
+            let mut data = DataObj::new();
+            cfg.write_to(&mut data);
+            unsafe {
+                obs_wrapper::obs_sys::obs_source_update(ptr, data.as_ptr_mut());
+                obs_wrapper::obs_sys::obs_frontend_open_source_properties(ptr);
+            }
         }
     }
+    apply_outputs();
 }
 
 fn ensure_settings_source() {
@@ -220,8 +253,13 @@ fn ensure_settings_source() {
 }
 
 pub fn apply_outputs() {
-    destroy_outputs();
     let cfg = current_config();
+    if let Ok(c) = CONTROLLER.lock() {
+        if c.applied.as_ref() == Some(&cfg) {
+            return;
+        }
+    }
+    destroy_outputs();
     if cfg.enabled {
         match OutputRef::new(crate::ids::output_id(), obs_string!("OMT Output"), None) {
             Ok(mut output) => {
@@ -237,18 +275,23 @@ pub fn apply_outputs() {
         }
     }
     crate::preview::apply(cfg.preview_enabled, &cfg.preview_name);
+    if let Ok(mut c) = CONTROLLER.lock() {
+        c.applied = Some(cfg);
+    }
 }
 
 pub fn destroy_outputs() {
-    if let Ok(mut c) = CONTROLLER.lock() {
-        if let Some(mut out) = c.main.take() {
-            out.stop();
-        }
+    let main = CONTROLLER.lock().ok().and_then(|mut c| {
+        c.applied = None;
+        c.main.take()
+    });
+    if let Some(mut out) = main {
+        out.stop();
     }
     crate::preview::stop();
 }
 
-pub fn persist_and_apply(settings: &mut DataObj) {
+pub fn persist_config(settings: &mut DataObj) {
     let cfg = OutputConfig::from_data(settings);
     if let Ok(mut c) = CONTROLLER.lock() {
         c.config = cfg.clone();
@@ -256,7 +299,6 @@ pub fn persist_and_apply(settings: &mut DataObj) {
             cfg.save_file(&path);
         }
     }
-    apply_outputs();
 }
 
 pub struct OmtOutputSettings;
@@ -298,6 +340,11 @@ impl GetPropertiesSource for OmtOutputSettings {
             obs_string!("Program Source Name"),
             TextProp::new(TextType::Default),
         );
+        crate::media_mode::add_media_mode_list(
+            &mut props,
+            crate::ids::PROP_PROGRAM_MODE,
+            obs_string!("Program Media"),
+        );
         props.add(
             ObsString::from(PROP_PREVIEW_ENABLED),
             obs_string!("Enable Preview Output"),
@@ -314,13 +361,13 @@ impl GetPropertiesSource for OmtOutputSettings {
 
 impl UpdateSource for OmtOutputSettings {
     fn update(&mut self, settings: &mut DataObj, _context: &mut GlobalContext) {
-        persist_and_apply(settings);
+        persist_config(settings);
     }
 }
 
 impl SaveSource for OmtOutputSettings {
     fn save(&mut self, settings: &mut DataObj) {
-        persist_and_apply(settings);
+        persist_config(settings);
     }
 }
 
