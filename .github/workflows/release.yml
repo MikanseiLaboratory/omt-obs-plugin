@@ -1,0 +1,138 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  validate-tag:
+    runs-on: ubuntu-latest
+    outputs:
+      prerelease: ${{ steps.check.outputs.prerelease }}
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - id: check
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          # Official: vX.Y.Z
+          # Test:    vX.Y.Z-alpha.N | vX.Y.Z-beta.N | vX.Y.Z-rc.N
+          if [[ "$tag" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+            echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+          elif [[ "$tag" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)-(alpha|beta|rc)\.([0-9]+)$ ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+            echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::Invalid tag '$tag'. Expected vX.Y.Z or vX.Y.Z-(alpha|beta|rc).N"
+            exit 1
+          fi
+
+  build:
+    needs: validate-tag
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: windows-x64
+            binary: omtplugin.dll
+            package_dir: omtplugin/bin/64bit
+          - os: ubuntu-latest
+            artifact: linux-x64
+            binary: libomtplugin.so
+            package_dir: omtplugin/bin/64bit
+          - os: macos-latest
+            artifact: macos-arm64
+            binary: libomtplugin.dylib
+            package_dir: omtplugin.plugin/Contents/MacOS
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@1.97.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install OBS (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo add-apt-repository ppa:obsproject/obs-studio
+          sudo apt-get update
+          sudo apt-get install -y obs-studio
+
+      - name: Install OBS (Windows)
+        if: runner.os == 'Windows'
+        run: choco install obs-studio llvm -y
+
+      - name: Install OBS (macOS)
+        if: runner.os == 'macOS'
+        run: brew install --cask obs
+
+      - run: cargo fmt -- --check
+      - run: cargo clippy --no-deps -- -D warnings
+      - run: cargo test
+        env:
+          DYLD_FALLBACK_FRAMEWORK_PATH: /Applications/OBS.app/Contents/Frameworks
+          DYLD_FALLBACK_LIBRARY_PATH: /Applications/OBS.app/Contents/Frameworks
+      - run: cargo build --release
+
+      - name: Package plugin
+        shell: bash
+        env:
+          VERSION: ${{ needs.validate-tag.outputs.version }}
+          ARTIFACT: ${{ matrix.artifact }}
+          BINARY: ${{ matrix.binary }}
+          PACKAGE_DIR: ${{ matrix.package_dir }}
+        run: |
+          set -euo pipefail
+          src="target/release/${BINARY}"
+          test -f "$src"
+          staging="dist/${PACKAGE_DIR}"
+          mkdir -p "$staging"
+          cp "$src" "$staging/"
+          archive="omt-obs-plugin-${VERSION}-${ARTIFACT}.zip"
+          python -c "import shutil; shutil.make_archive('omt-obs-plugin', 'zip', 'dist')"
+          mv omt-obs-plugin.zip "${archive}"
+          echo "built ${archive} ($(wc -c < "${archive}") bytes)"
+          mkdir -p release-assets
+          mv "${archive}" release-assets/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: plugin-${{ matrix.artifact }}
+          path: release-assets/*.zip
+          if-no-files-found: error
+
+  release:
+    needs: [validate-tag, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: plugin-*
+          merge-multiple: true
+
+      - name: List release assets
+        run: ls -la artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
+          prerelease: ${{ needs.validate-tag.outputs.prerelease == 'true' }}
+          make_latest: ${{ needs.validate-tag.outputs.prerelease == 'true' && 'false' || 'true' }}
+          files: artifacts/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
