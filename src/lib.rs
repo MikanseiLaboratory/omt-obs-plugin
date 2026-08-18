@@ -1,6 +1,6 @@
 //! Pure-Rust Open Media Transport plugin for OBS Studio.
 
-use log::info;
+use log::{info, LevelFilter, Log, Metadata, Record};
 use obs_wrapper::frontend;
 use obs_wrapper::log::Logger;
 use obs_wrapper::prelude::*;
@@ -15,6 +15,7 @@ mod format;
 mod graphics_capture;
 mod ids;
 mod media_mode;
+mod omt_file_log;
 mod output;
 mod preview;
 mod receive;
@@ -38,7 +39,11 @@ impl Module for OmtModule {
     }
 
     fn load(&mut self, load_context: &mut LoadContext) -> bool {
-        let _ = Logger::new().with_promote_debug(true).init();
+        omt_file_log::init();
+        let _ = TeeLogger {
+            obs: Logger::new().with_promote_debug(true),
+        }
+        .init();
         info!(
             "omt-obs-plugin {} loading (libobs API {})",
             env!("CARGO_PKG_VERSION"),
@@ -128,3 +133,31 @@ impl Module for OmtModule {
 }
 
 obs_register_module!(OmtModule);
+
+struct TeeLogger {
+    obs: Logger,
+}
+
+impl TeeLogger {
+    fn init(self) -> Result<(), log::SetLoggerError> {
+        log::set_max_level(LevelFilter::Trace);
+        log::set_boxed_logger(Box::new(self))
+    }
+}
+
+impl Log for TeeLogger {
+    fn enabled(&self, metadata: &Metadata) -> bool {
+        self.obs.enabled(metadata)
+    }
+
+    fn log(&self, record: &Record) {
+        self.obs.log(record);
+        if self.enabled(record.metadata()) {
+            omt_file_log::write(&format!("{}", record.args()), record.target());
+        }
+    }
+
+    fn flush(&self) {
+        self.obs.flush();
+    }
+}
