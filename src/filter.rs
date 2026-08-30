@@ -159,7 +159,7 @@ impl Sourceable for OmtSendFilter {
 
 impl GetNameSource for OmtSendFilter {
     fn get_name() -> ObsString {
-        obs_string!("OMT Dedicated Output")
+        obs_string!("OMT Dedicated Output (Rust)")
     }
 }
 
@@ -170,6 +170,7 @@ impl GetDefaultsSource for OmtSendFilter {
             ObsString::from(DEFAULT_FILTER_NAME),
         );
         settings.set_default::<i64>(ObsString::from(PROP_FILTER_MODE), 0);
+        crate::ids::apply_official_plugin_note_default(settings);
     }
 }
 
@@ -182,6 +183,7 @@ impl GetPropertiesSource for OmtSendFilter {
             TextProp::new(TextType::Default),
         );
         crate::media_mode::add_media_mode_list(&mut props, PROP_FILTER_MODE, obs_string!("Media"));
+        crate::ids::add_official_plugin_note(&mut props);
         props
     }
 }

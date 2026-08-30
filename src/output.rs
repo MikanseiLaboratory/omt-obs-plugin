@@ -1,4 +1,4 @@
-//! Program OMT output (`omtoutput`) plus Tools-menu settings.
+//! Program OMT output (`omtobs_output`) plus Tools-menu settings.
 
 use std::sync::Mutex;
 
@@ -112,7 +112,7 @@ impl Outputable for OmtOutput {
 
 impl GetNameOutput for OmtOutput {
     fn get_name() -> ObsString {
-        obs_string!("OMT Output")
+        obs_string!("OMT Output (Rust)")
     }
 }
 
@@ -244,7 +244,7 @@ fn ensure_settings_source() {
     let src = unsafe {
         obs_wrapper::obs_sys::obs_source_create(
             crate::ids::settings_id().as_ptr(),
-            obs_string!("OMT Output Settings").as_ptr(),
+            obs_string!("OMT Output Settings (Rust)").as_ptr(),
             data.as_ptr_mut(),
             std::ptr::null_mut(),
         )
@@ -261,7 +261,11 @@ pub fn apply_outputs() {
     }
     destroy_outputs();
     if cfg.enabled {
-        match OutputRef::new(crate::ids::output_id(), obs_string!("OMT Output"), None) {
+        match OutputRef::new(
+            crate::ids::output_id(),
+            obs_string!("OMT Output (Rust)"),
+            None,
+        ) {
             Ok(mut output) => {
                 if output.start() {
                     if let Ok(mut c) = CONTROLLER.lock() {
@@ -317,13 +321,14 @@ impl Sourceable for OmtOutputSettings {
 
 impl GetNameSource for OmtOutputSettings {
     fn get_name() -> ObsString {
-        obs_string!("OMT Output Settings")
+        obs_string!("OMT Output Settings (Rust)")
     }
 }
 
 impl GetDefaultsSource for OmtOutputSettings {
     fn get_defaults(settings: &mut DataObj) {
         OutputConfig::apply_defaults(settings);
+        crate::ids::apply_official_plugin_note_default(settings);
     }
 }
 
@@ -355,6 +360,7 @@ impl GetPropertiesSource for OmtOutputSettings {
             obs_string!("Preview Source Name"),
             TextProp::new(TextType::Default),
         );
+        crate::ids::add_official_plugin_note(&mut props);
         props
     }
 }

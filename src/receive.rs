@@ -1,4 +1,4 @@
-//! OMT receive source (`omtsource`).
+//! OMT receive source (`omtobs_source`).
 
 use std::borrow::Cow;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -318,7 +318,7 @@ impl Sourceable for OmtReceiveSource {
 
 impl GetNameSource for OmtReceiveSource {
     fn get_name() -> ObsString {
-        obs_string!("OMT Source")
+        obs_string!("OMT Source (Rust)")
     }
 }
 
@@ -332,6 +332,7 @@ impl GetDefaultsSource for OmtReceiveSource {
         settings.set_default::<i64>(ObsString::from(PROP_COLOR_SPACE), 0);
         settings.set_default::<bool>(ObsString::from(PROP_PREVIEW), false);
         settings.set_default::<i64>(ObsString::from(PROP_BANDWIDTH_POLICY), 0);
+        crate::ids::apply_official_plugin_note_default(settings);
     }
 }
 
@@ -405,6 +406,7 @@ impl GetPropertiesSource for OmtReceiveSource {
             cs.push(obs_string!("BT709"), 709);
         }
         add_bandwidth_policy_list(&mut props, PROP_BANDWIDTH_POLICY);
+        crate::ids::add_official_plugin_note(&mut props);
         props
     }
 }

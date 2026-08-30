@@ -1,4 +1,4 @@
-//! Persistent OMT output settings (`omtplugin.json`).
+//! Persistent OMT output settings (`omt-obs-plugin.json`).
 
 use std::borrow::Cow;
 use std::fs;

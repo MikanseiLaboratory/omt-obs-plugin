@@ -41,16 +41,16 @@ jobs:
         include:
           - os: windows-latest
             artifact: windows-x64
-            binary: omtplugin.dll
-            package_dir: omtplugin/bin/64bit
+            binary: omt_obs_plugin.dll
+            package_dir: omt-obs-plugin/bin/64bit
           - os: ubuntu-latest
             artifact: linux-x64
-            binary: libomtplugin.so
-            package_dir: omtplugin/bin/64bit
+            binary: libomt_obs_plugin.so
+            package_dir: omt-obs-plugin/bin/64bit
           - os: macos-latest
             artifact: macos-arm64
-            binary: libomtplugin.dylib
-            package_dir: omtplugin.plugin/Contents/MacOS
+            binary: libomt_obs_plugin.dylib
+            package_dir: omt-obs-plugin.plugin/Contents/MacOS
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -98,6 +98,10 @@ jobs:
           staging="dist/${PACKAGE_DIR}"
           mkdir -p "$staging"
           cp "$src" "$staging/"
+          if [[ "${{ runner.os }}" == "macOS" ]]; then
+            sed "s/0.1.0/${VERSION}/g" installer/macos/Info.plist \
+              > dist/omt-obs-plugin.plugin/Contents/Info.plist
+          fi
           archive="omt-obs-plugin-${VERSION}-${ARTIFACT}.zip"
           python -c "import shutil; shutil.make_archive('omt-obs-plugin', 'zip', 'dist')"
           mv omt-obs-plugin.zip "${archive}"
@@ -105,10 +109,40 @@ jobs:
           mkdir -p release-assets
           mv "${archive}" release-assets/
 
+      - name: Build Windows installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.validate-tag.outputs.version }}
+        run: |
+          choco install innosetup -y
+          $iscc = Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { $iscc = "ISCC.exe" }
+          & $iscc "/DMyAppVersion=$env:VERSION" installer\windows\omt-obs-plugin.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed" }
+          New-Item -ItemType Directory -Force -Path release-assets | Out-Null
+          Move-Item -Force "dist\omt-obs-plugin-$env:VERSION-windows-x64-setup.exe" release-assets\
+
+      - name: Build macOS package
+        if: runner.os == 'macOS'
+        env:
+          VERSION: ${{ needs.validate-tag.outputs.version }}
+        run: bash installer/macos/build-pkg.sh "$VERSION"
+
+      - name: Build Linux package
+        if: runner.os == 'Linux'
+        env:
+          VERSION: ${{ needs.validate-tag.outputs.version }}
+        run: bash installer/linux/build-deb.sh "$VERSION"
+
       - uses: actions/upload-artifact@v4
         with:
           name: plugin-${{ matrix.artifact }}
-          path: release-assets/*.zip
+          path: |
+            release-assets/*.zip
+            release-assets/*.exe
+            release-assets/*.pkg
+            release-assets/*.deb
           if-no-files-found: error
 
   release:
@@ -133,6 +167,10 @@ jobs:
           generate_release_notes: true
           prerelease: ${{ needs.validate-tag.outputs.prerelease == 'true' }}
           make_latest: ${{ needs.validate-tag.outputs.prerelease == 'true' && 'false' || 'true' }}
-          files: artifacts/*.zip
+          files: |
+            artifacts/*.zip
+            artifacts/*.exe
+            artifacts/*.pkg
+            artifacts/*.deb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

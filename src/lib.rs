@@ -51,7 +51,7 @@ impl Module for OmtModule {
             obs_wrapper::obs_sys::LIBOBS_API_VER
         );
 
-        if let Ok(path) = self.context.config_path(obs_string!("omtplugin.json")) {
+        if let Ok(path) = self.context.config_path(obs_string!("omt-obs-plugin.json")) {
             output::init_controller(path);
         }
 
@@ -113,7 +113,7 @@ impl Module for OmtModule {
         if frontend::has_main_window() {
             frontend::add_event_callback(output::on_frontend_event);
             frontend::add_tools_menu_item(
-                obs_string!("OMT Output Settings"),
+                obs_string!("OMT Output Settings (Rust)"),
                 output::show_settings,
             );
         }
@@ -126,7 +126,7 @@ impl Module for OmtModule {
     }
 
     fn description() -> ObsString {
-        obs_string!("Pure-Rust Open Media Transport (OMT) source, output, preview, and filter.")
+        obs_string!("Pure-Rust OMT plugin. Coexists with official omtplugin: https://github.com/openmediatransport/omtplugin")
     }
 
     fn name() -> ObsString {

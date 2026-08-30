@@ -37,7 +37,7 @@ impl BandwidthPolicy {
         }
     }
 
-    /// Resolve the policy from the new key, falling back to legacy `previewProperty`.
+    /// Resolve the policy from the new key, falling back to legacy `omtobs_preview`.
     pub fn from_settings(policy: Option<i64>, legacy_preview: bool) -> Self {
         match policy {
             Some(v) => Self::from_i64(v),
