@@ -57,7 +57,7 @@ jobs:
             package_dir: omt-obs-plugin.plugin/Contents/MacOS
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: dtolnay/rust-toolchain@1.97.0
         with:
@@ -140,7 +140,7 @@ jobs:
           VERSION: ${{ needs.validate-tag.outputs.version }}
         run: bash installer/linux/build-deb.sh "$VERSION"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: plugin-${{ matrix.artifact }}
           path: |
@@ -156,7 +156,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
           pattern: plugin-*
@@ -166,7 +166,7 @@ jobs:
         run: ls -la artifacts
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: ${{ github.ref_name }}
           generate_release_notes: true
