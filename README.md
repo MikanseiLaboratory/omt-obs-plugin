@@ -46,6 +46,8 @@ Output: `omtplugin.dll` / `libomtplugin.so` / `libomtplugin.dylib`.
 
 ### Install
 
+[Get latest release here](https://github.com/MikanseiLaboratory/omt-obs-plugin/releases/latest)
+
 - **Windows:** `%PROGRAMDATA%\obs-studio\plugins\omtplugin\bin\64bit\omtplugin.dll`
 - **macOS:** `~/Library/Application Support/obs-studio/plugins/omtplugin.plugin/Contents/MacOS/`
 - **Linux:** `~/.config/obs-studio/plugins/omtplugin/bin/64bit/libomtplugin.so`
