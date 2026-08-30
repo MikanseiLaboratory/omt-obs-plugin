@@ -60,7 +60,10 @@ Run `omt-obs-plugin-*-windows-x64-setup.exe`. It installs to `%PROGRAMDATA%\obs-
 
 ### macOS
 
-Open `omt-obs-plugin-*-macos-arm64.pkg` and follow the prompts. It installs to `/Library/Application Support/obs-studio/plugins/omt-obs-plugin.plugin`.
+Open the `.pkg` that matches the Mac, then follow the prompts. Both install to `/Library/Application Support/obs-studio/plugins/omt-obs-plugin.plugin`.
+
+- Apple silicon: `omt-obs-plugin-*-macos-arm64.pkg`
+- Intel: `omt-obs-plugin-*-macos-x64.pkg`
 
 ### Linux
 
@@ -73,7 +76,7 @@ Installs `libomt_obs_plugin.so` to `/usr/lib/x86_64-linux-gnu/obs-plugins/`.
 ### Manual zip
 
 - **Windows:** `%PROGRAMDATA%\obs-studio\plugins\omt-obs-plugin\bin\64bit\omt_obs_plugin.dll`
-- **macOS:** `~/Library/Application Support/obs-studio/plugins/omt-obs-plugin.plugin/Contents/MacOS/`
+- **macOS:** `~/Library/Application Support/obs-studio/plugins/omt-obs-plugin.plugin/Contents/MacOS/` (`macos-arm64` or `macos-x64` zip)
 - **Linux:** `~/.config/obs-studio/plugins/omt-obs-plugin/bin/64bit/libomt_obs_plugin.so`
 
 ## Build

@@ -1,11 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="${1:?usage: build-pkg.sh <version>}"
+VERSION="${1:?usage: build-pkg.sh <version> [dylib] [artifact]}"
 SRC="${2:-target/release/libomt_obs_plugin.dylib}"
+ARTIFACT="${3:-}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 OUT_DIR="${ROOT}/release-assets"
 BUNDLE_NAME="omt-obs-plugin.plugin"
+if [[ -z "${ARTIFACT}" ]]; then
+  case "$(uname -m)" in
+    arm64) ARTIFACT=macos-arm64 ;;
+    *) ARTIFACT=macos-x64 ;;
+  esac
+fi
 PAYLOAD="$(mktemp -d)"
 trap 'rm -rf "${PAYLOAD}"' EXIT
 
@@ -28,6 +35,6 @@ pkgbuild \
   --identifier lab.mikansei.omt-obs-plugin \
   --version "${VERSION}" \
   --install-location / \
-  "${OUT_DIR}/omt-obs-plugin-${VERSION}-macos-arm64.pkg"
+  "${OUT_DIR}/omt-obs-plugin-${VERSION}-${ARTIFACT}.pkg"
 
-echo "built ${OUT_DIR}/omt-obs-plugin-${VERSION}-macos-arm64.pkg"
+echo "built ${OUT_DIR}/omt-obs-plugin-${VERSION}-${ARTIFACT}.pkg"

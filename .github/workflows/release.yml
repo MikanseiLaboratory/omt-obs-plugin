@@ -51,6 +51,10 @@ jobs:
             artifact: macos-arm64
             binary: libomt_obs_plugin.dylib
             package_dir: omt-obs-plugin.plugin/Contents/MacOS
+          - os: macos-13
+            artifact: macos-x64
+            binary: libomt_obs_plugin.dylib
+            package_dir: omt-obs-plugin.plugin/Contents/MacOS
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -127,7 +131,8 @@ jobs:
         if: runner.os == 'macOS'
         env:
           VERSION: ${{ needs.validate-tag.outputs.version }}
-        run: bash installer/macos/build-pkg.sh "$VERSION"
+          ARTIFACT: ${{ matrix.artifact }}
+        run: bash installer/macos/build-pkg.sh "$VERSION" target/release/libomt_obs_plugin.dylib "$ARTIFACT"
 
       - name: Build Linux package
         if: runner.os == 'Linux'
