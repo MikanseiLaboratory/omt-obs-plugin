@@ -14,7 +14,16 @@ Pure-Rust Open Media Transport plugin for OBS Studio 32.2.1.
 | Preview output | — | Studio Mode preview, or the current scene |
 | Dedicated filter | `omt_filter` | Sends the filtered source or scene |
 
-Settings keys: `sourceProperty`, `qualityProperty`, `enabledProperty`, `nameProperty`, plus `previewEnabledProperty` / `previewNameProperty`. Program and Dedicated Output also have Embedded / Video Only / Audio Only (`programModeProperty`, `filterModeProperty`).
+Settings keys: `sourceProperty`, `qualityProperty`, `enabledProperty`, `nameProperty`, plus `previewEnabledProperty` / `previewNameProperty`. Receive sources also have `bandwidthPolicyProperty` (and keep writing `previewProperty` for C# omtplugin: true when policy is Always). Program and Dedicated Output also have Embedded / Video Only / Audio Only (`programModeProperty`, `filterModeProperty`).
+
+OMT Source **Save bandwidth when** switches between the sender's 1/8 Preview stream and **Suggested Quality**:
+
+- **None (always full)** — always Suggested Quality.
+- **Not on Program** — Preview unless the source is on Program (nested scenes included). Studio Preview / Multiview stay on Preview.
+- **Not on Preview/Program** — Preview unless the source is shown anywhere (`showing`: Program, Preview, Multiview, projector).
+- **Always** — always Preview (legacy `previewProperty=true`).
+
+OBS 32.2 cannot distinguish Studio Preview from Multiview or a projector. Opening the source properties preview also counts as `showing`.
 
 ## Formats
 

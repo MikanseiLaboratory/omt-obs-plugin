@@ -15,15 +15,18 @@ use obs_wrapper::obs_sys::{
     speaker_layout_SPEAKERS_STEREO, video_format_VIDEO_FORMAT_BGRA,
 };
 use obs_wrapper::prelude::*;
-use obs_wrapper::properties::{BoolProp, ListProp, Properties};
+use obs_wrapper::properties::{ListProp, Properties};
 use obs_wrapper::source::*;
 use obs_wrapper::wrapper::PtrWrapper;
 use openmediatransport::{
-    ColorSpace, Discovery, FrameType, Quality, ReceiverConfig, ReceiverSession,
+    ColorSpace, Discovery, FrameType, Quality, ReceiverConfig, ReceiverSession, Tally,
 };
 
+use crate::bandwidth::{add_bandwidth_policy_list, BandwidthPolicy};
 use crate::clock::omt_ticks_to_obs_ns;
-use crate::ids::{PROP_COLOR_SPACE, PROP_PREVIEW, PROP_QUALITY, PROP_SOURCE};
+use crate::ids::{
+    PROP_BANDWIDTH_POLICY, PROP_COLOR_SPACE, PROP_PREVIEW, PROP_QUALITY, PROP_SOURCE,
+};
 
 static DISCOVERY: Mutex<Option<DiscoveryCache>> = Mutex::new(None);
 
@@ -69,12 +72,24 @@ fn color_space_from_i64(v: i64) -> ColorSpace {
     }
 }
 
+fn policy_from_settings(settings: &DataObj<'_>) -> BandwidthPolicy {
+    BandwidthPolicy::from_settings(
+        settings.get::<i64>(ObsString::from(PROP_BANDWIDTH_POLICY)),
+        settings
+            .get::<bool>(ObsString::from(PROP_PREVIEW))
+            .unwrap_or(false),
+    )
+}
+
 pub struct OmtReceiveSource {
     source: SourceRef,
     address: String,
     quality: Quality,
-    preview: bool,
+    policy: BandwidthPolicy,
     color_space: ColorSpace,
+    desired_preview: Arc<AtomicBool>,
+    tally_preview: Arc<AtomicBool>,
+    tally_program: Arc<AtomicBool>,
     stop: Option<Arc<AtomicBool>>,
     join: Option<JoinHandle<()>>,
 }
@@ -89,7 +104,25 @@ impl OmtReceiveSource {
         }
     }
 
-    fn apply_settings(&mut self, settings: &mut DataObj) {
+    fn persist_policy(&self, settings: &mut DataObj<'_>) {
+        settings.set_int(ObsString::from(PROP_BANDWIDTH_POLICY), self.policy.as_i64());
+        settings.set_bool(
+            ObsString::from(PROP_PREVIEW),
+            self.policy == BandwidthPolicy::Always,
+        );
+    }
+
+    fn refresh_visibility(&mut self) {
+        let active = self.source.active();
+        let showing = self.source.showing();
+        self.desired_preview
+            .store(self.policy.use_preview(active, showing), Ordering::Release);
+        self.tally_preview
+            .store(showing && !active, Ordering::Release);
+        self.tally_program.store(active, Ordering::Release);
+    }
+
+    fn apply_settings(&mut self, settings: &mut DataObj<'_>) {
         let address = settings
             .get::<Cow<str>>(ObsString::from(PROP_SOURCE))
             .unwrap_or(Cow::Borrowed(""))
@@ -100,24 +133,22 @@ impl OmtReceiveSource {
                 .get::<i64>(ObsString::from(PROP_QUALITY))
                 .unwrap_or(0),
         );
-        let preview = settings
-            .get::<bool>(ObsString::from(PROP_PREVIEW))
-            .unwrap_or(false);
+        let policy = policy_from_settings(settings);
         let color_space = color_space_from_i64(
             settings
                 .get::<i64>(ObsString::from(PROP_COLOR_SPACE))
                 .unwrap_or(0),
         );
 
-        let changed = address != self.address
-            || quality != self.quality
-            || preview != self.preview
-            || color_space != self.color_space;
+        let reconnect =
+            address != self.address || quality != self.quality || color_space != self.color_space;
         self.address = address;
         self.quality = quality;
-        self.preview = preview;
+        self.policy = policy;
         self.color_space = color_space;
-        if changed {
+        self.persist_policy(settings);
+        self.refresh_visibility();
+        if reconnect {
             self.restart();
         }
     }
@@ -128,14 +159,19 @@ impl OmtReceiveSource {
             return;
         }
         let stop = Arc::new(AtomicBool::new(false));
-        let stop_c = Arc::clone(&stop);
         let address = self.address.clone();
         let quality = self.quality;
-        let preview = self.preview;
+        let preview = self.desired_preview.load(Ordering::Acquire);
+        let ctrl = ReceiveCtrl {
+            desired_preview: Arc::clone(&self.desired_preview),
+            tally_preview: Arc::clone(&self.tally_preview),
+            tally_program: Arc::clone(&self.tally_program),
+            stop: Arc::clone(&stop),
+        };
         let source_ptr = unsafe { self.source.as_ptr() as usize };
         match thread::Builder::new()
             .name("omt-rx".into())
-            .spawn(move || receive_loop(address, quality, preview, source_ptr, stop_c))
+            .spawn(move || receive_loop(address, quality, preview, ctrl, source_ptr))
         {
             Ok(join) => {
                 self.stop = Some(stop);
@@ -152,12 +188,19 @@ impl Drop for OmtReceiveSource {
     }
 }
 
+struct ReceiveCtrl {
+    desired_preview: Arc<AtomicBool>,
+    tally_preview: Arc<AtomicBool>,
+    tally_program: Arc<AtomicBool>,
+    stop: Arc<AtomicBool>,
+}
+
 fn receive_loop(
     address: String,
     quality: Quality,
     preview: bool,
+    ctrl: ReceiveCtrl,
     source_ptr: usize,
-    stop: Arc<AtomicBool>,
 ) {
     let config = ReceiverConfig {
         frame_types: FrameType::VIDEO | FrameType::AUDIO,
@@ -178,7 +221,33 @@ fn receive_loop(
     if source.is_null() {
         return;
     }
-    while !stop.load(Ordering::Acquire) {
+    let mut preview = preview;
+    let mut last_tally_preview = ctrl.tally_preview.load(Ordering::Acquire);
+    let mut last_tally_program = ctrl.tally_program.load(Ordering::Acquire);
+    let send_tally = |preview: bool, program: bool| {
+        if let Err(e) = session.set_tally(Tally::new(i32::from(preview), i32::from(program))) {
+            warn!("OMT tally send failed: {e}");
+        }
+    };
+    send_tally(last_tally_preview, last_tally_program);
+    while !ctrl.stop.load(Ordering::Acquire) {
+        let want_preview = ctrl.desired_preview.load(Ordering::Acquire);
+        if want_preview != preview {
+            match session.set_preview(want_preview) {
+                Ok(()) => {
+                    info!("OMT receive preview={want_preview}");
+                    preview = want_preview;
+                }
+                Err(e) => warn!("OMT set_preview failed: {e}"),
+            }
+        }
+        let tp = ctrl.tally_preview.load(Ordering::Acquire);
+        let tg = ctrl.tally_program.load(Ordering::Acquire);
+        if tp != last_tally_preview || tg != last_tally_program {
+            send_tally(tp, tg);
+            last_tally_preview = tp;
+            last_tally_program = tg;
+        }
         if let Some(video) = session.recv_video_timeout(Duration::from_millis(50)) {
             let mut frame = obs_source_frame {
                 width: video.width,
@@ -234,8 +303,11 @@ impl Sourceable for OmtReceiveSource {
             source,
             address: String::new(),
             quality: Quality::Default,
-            preview: false,
+            policy: BandwidthPolicy::None,
             color_space: ColorSpace::Undefined,
+            desired_preview: Arc::new(AtomicBool::new(false)),
+            tally_preview: Arc::new(AtomicBool::new(false)),
+            tally_program: Arc::new(AtomicBool::new(false)),
             stop: None,
             join: None,
         };
@@ -259,12 +331,43 @@ impl GetDefaultsSource for OmtReceiveSource {
         settings.set_default::<i64>(ObsString::from(PROP_QUALITY), 0);
         settings.set_default::<i64>(ObsString::from(PROP_COLOR_SPACE), 0);
         settings.set_default::<bool>(ObsString::from(PROP_PREVIEW), false);
+        settings.set_default::<i64>(ObsString::from(PROP_BANDWIDTH_POLICY), 0);
     }
 }
 
 impl UpdateSource for OmtReceiveSource {
     fn update(&mut self, settings: &mut DataObj, _context: &mut GlobalContext) {
         self.apply_settings(settings);
+    }
+}
+
+impl SaveSource for OmtReceiveSource {
+    fn save(&mut self, settings: &mut DataObj) {
+        self.persist_policy(settings);
+    }
+}
+
+impl ActivateSource for OmtReceiveSource {
+    fn activate(&mut self) {
+        self.refresh_visibility();
+    }
+}
+
+impl DeactivateSource for OmtReceiveSource {
+    fn deactivate(&mut self) {
+        self.refresh_visibility();
+    }
+}
+
+impl ShowSource for OmtReceiveSource {
+    fn show(&mut self) {
+        self.refresh_visibility();
+    }
+}
+
+impl HideSource for OmtReceiveSource {
+    fn hide(&mut self) {
+        self.refresh_visibility();
     }
 }
 
@@ -301,11 +404,7 @@ impl GetPropertiesSource for OmtReceiveSource {
             cs.push(obs_string!("BT601"), 601);
             cs.push(obs_string!("BT709"), 709);
         }
-        props.add(
-            ObsString::from(PROP_PREVIEW),
-            obs_string!("Preview Mode"),
-            BoolProp,
-        );
+        add_bandwidth_policy_list(&mut props, PROP_BANDWIDTH_POLICY);
         props
     }
 }

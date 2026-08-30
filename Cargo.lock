@@ -146,7 +146,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -387,10 +387,11 @@ checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 [[package]]
 name = "openmediatransport"
 version = "0.1.0"
-source = "git+https://github.com/MikanseiLaboratory/openmediatransport-rs#55ffd08ab899f8017056886157fb0d130ab36d5c"
+source = "git+https://github.com/MikanseiLaboratory/openmediatransport-rs?rev=09cdcaf49586491cf709dc472cf84143fc152848#09cdcaf49586491cf709dc472cf84143fc152848"
 dependencies = [
  "bytes",
  "mdns-sd",
+ "roxmltree",
  "socket2",
  "thiserror 2.0.20",
  "tracing",
@@ -515,6 +516,15 @@ name = "regex-syntax"
 version = "0.8.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
+
+[[package]]
+name = "roxmltree"
+version = "0.21.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f1964b10c76125c36f8afe190065a4bf9a87bf324842c05701330bba9f1cacbb"
+dependencies = [
+ "memchr",
+]
 
 [[package]]
 name = "rustc-hash"
@@ -694,7 +704,7 @@ checksum = "e6e4313cd5fcd3dad5cafa179702e2b244f760991f45397d14d4ebf38247da75"
 [[package]]
 name = "vmx"
 version = "0.1.0"
-source = "git+https://github.com/MikanseiLaboratory/vmx-rs#d860377cf91646a0c165dfbddc4467f4ee02762b"
+source = "git+https://github.com/MikanseiLaboratory/vmx-rs#ea429b39af848cd8a46cb41c77434ff031c8dd5c"
 dependencies = [
  "rayon",
  "thiserror 2.0.20",
