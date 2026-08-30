@@ -15,6 +15,7 @@ jobs:
           - os: windows-latest
           - os: ubuntu-latest
           - os: macos-latest
+          - os: macos-15-intel
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -45,9 +46,9 @@ jobs:
         shell: bash
         run: |
           case "${{ runner.os }}" in
-            Windows) f=target/release/omtplugin.dll ;;
-            macOS) f=target/release/libomtplugin.dylib ;;
-            *) f=target/release/libomtplugin.so ;;
+            Windows) f=target/release/omt_obs_plugin.dll ;;
+            macOS) f=target/release/libomt_obs_plugin.dylib ;;
+            *) f=target/release/libomt_obs_plugin.so ;;
           esac
           test -f "$f"
           echo "built $f ($(wc -c < "$f") bytes)"

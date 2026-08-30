@@ -10,7 +10,7 @@ repository = "https://github.com/MikanseiLaboratory/omt-obs-plugin"
 readme = "README.md"
 
 [lib]
-name = "omtplugin"
+name = "omt_obs_plugin"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
