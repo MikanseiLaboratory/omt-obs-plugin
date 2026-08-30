@@ -7,6 +7,7 @@ use obs_wrapper::prelude::*;
 use obs_wrapper::source::Icon;
 use obs_wrapper::{obs_register_module, obs_string};
 
+mod bandwidth;
 mod channel;
 mod clock;
 mod config;
@@ -59,7 +60,12 @@ impl Module for OmtModule {
             .enable_get_name()
             .enable_get_defaults()
             .enable_update()
+            .enable_save()
             .enable_get_properties()
+            .enable_activate()
+            .enable_deactivate()
+            .enable_show()
+            .enable_hide()
             .enable_async_video()
             .enable_audio()
             .with_icon(Icon::Camera)

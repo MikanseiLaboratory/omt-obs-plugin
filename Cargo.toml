@@ -15,5 +15,5 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 obs-wrapper = { git = "https://github.com/MikanseiLaboratory/rust-obs-plugins.git", rev = "2d90be795e7ca95dbdc46f9222ea7299c23c45dd" }
-openmediatransport = { git = "https://github.com/MikanseiLaboratory/openmediatransport-rs" }
+openmediatransport = { git = "https://github.com/MikanseiLaboratory/openmediatransport-rs", rev = "09cdcaf49586491cf709dc472cf84143fc152848" }
 log = "0.4"

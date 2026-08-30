@@ -13,6 +13,7 @@ pub const PROP_SOURCE: &str = "sourceProperty";
 pub const PROP_QUALITY: &str = "qualityProperty";
 pub const PROP_COLOR_SPACE: &str = "csProperty";
 pub const PROP_PREVIEW: &str = "previewProperty";
+pub const PROP_BANDWIDTH_POLICY: &str = "bandwidthPolicyProperty";
 pub const PROP_ENABLED: &str = "enabledProperty";
 pub const PROP_NAME: &str = "nameProperty";
 pub const PROP_PREVIEW_ENABLED: &str = "previewEnabledProperty";
