@@ -179,3 +179,12 @@ jobs:
             artifacts/*.deb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  announce-discord:
+    name: Announce release on Discord
+    needs: [release]
+    uses: ./.github/workflows/discord-notify.yml
+    with:
+      tag: "${{ github.event.inputs.tag || github.ref_name }}"
+    secrets:
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
